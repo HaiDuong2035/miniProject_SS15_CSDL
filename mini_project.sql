@@ -167,11 +167,11 @@ begin
     
     select count(*) into count_email
     from users
-    where username = p_email;
+    where email = p_email;
     
-    select count(*) into count_email
+    select count(*) into count_username
     from users
-    where username = p_email;
+    where username = p_username;
     
     if count_email <> 0 then
 		signal sqlstate '45000'
@@ -208,7 +208,7 @@ delimiter //
 
 create trigger tg_after_like_delete
 
-after insert on likes
+after delete on likes
 
 for each row
 
@@ -252,7 +252,7 @@ delimiter //
 
 create trigger tg_after_comment_delete
 
-after insert on comments
+after delete on comments
 
 for each row
 
@@ -303,52 +303,14 @@ begin
 	
     start transaction;
     
-    delete from likes
-    where user_id = p_user_id;
+    delete u, p, l, c
+    from users u
+    left join posts p on u.user_id = p.user_id
+    left join likes l on l.post_id = p.post_id
+    left join comments c on c.post_id = p.post_id
+    where u.user_id = p_user_id;
     
-    delete from comments
-    where user_id = p_user_id;
-    
-    delete from posts
-    where user_id = p_user_id;
-    
-    delete from users
-    where user_id = p_user_id;
-    
-    if
-		p_user_id in (
-			select user_id
-            from likes
-            where user_id = p_user_id
-		) then
-			rollback;
-	elseif
-		p_user_id in (
-			select user_id
-            from comments
-            where user_id = p_user_id
-		) 
-			then
-				rollback;
-	elseif
-		p_user_id in (
-			select user_id
-            from posts
-            where user_id = p_user_id
-		)
-			then
-				rollback;
-	elseif
-		p_user_id in (
-			select user_id
-            from users
-            where user_id = p_user_id
-		)
-			then
-				rollback;
-	else
-		commit;
-	end if;
+    commit;
     
 end //
 
@@ -370,11 +332,11 @@ begin
     
     select count(*) into count_accepted
     from friends
-	where (new.user_id, new.friend_id) in ((user_id, friend_id), (friend_id, user_id)) and status = 'accepted';
+	where ((user_id = new.user_id and friend_id = new.friend_id) or (user_id = new.friend_id and friend_id = new.user_id)) and status = 'accepted';
     
     select count(*) into count_pending
     from friends
-	where (new.user_id, new.friend_id) in ((user_id, friend_id), (friend_id, user_id)) and status = 'pending';
+	where ((user_id = new.user_id and friend_id = new.friend_id) or (user_id = new.friend_id and friend_id = new.user_id)) and status = 'pending';
 	
     if new.user_id = new.friend_id then
 		signal sqlstate '45000'
